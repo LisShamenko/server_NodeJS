@@ -21,9 +21,21 @@ module.exports = (injectedOptions) => {
         resultsDB : resultsDB,
         tokensDB : tokensDB, 
         userDB : userDB,
+        createToken : createToken,
+        // -----------------------------
         getTestRouter : getTestRouter,
     };
 }
+
+function createToken(userId, cbFunc) {
+    crypto.randomBytes(64, (err, buffer) => {
+        if (err) return cbFunc(err, null);
+        let token = crypto.createHash('sha1').update(buffer).digest('hex');
+        cbFunc(false, token);
+    });
+}
+
+// ------------------------------------------------
 
 function getTestRouter(express) {
     const router = express.Router();

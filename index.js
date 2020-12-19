@@ -32,6 +32,74 @@ app.get("/GameVersion", function(req, res) {
     res.send('ok');
 });
 
+// регистрация пользователя
+app.post("/register", function(req, res) {
+    let username =  req.body.name;
+    let password = req.body.password;
+    database.userDB.selectUser(username, password, (err, result) => {
+        if (err) return sendJson(res, err.message, 'fail', '');
+        if (result != null && result.id) return sendJson(res, 'Пользователь уже существует!', 'fail', '');
+        insertUser(res, username, password);
+    });
+});
+
+function insertUser(res, username, password) {
+    database.userDB.insertUser(username, password, (err, result) => {
+        if (err) return sendJson(res, err.message, 'fail', '');
+        userLogin(res, result.id);
+    });
+}
+
+// аутентификация пользователя
+app.post("/login", function(req, res) {
+    let username = req.body.name;
+    let password = req.body.password;
+    database.userDB.selectUser(username, password, (err, result) => {
+        if (err) return sendJson(res, err.message, 'fail', '');
+        userLogin(res, result.id);
+    });
+});
+
+function userLogin(res, userId) {
+    database.createToken(userId, (err, token) => {
+        if (err) return sendJson(res, err.message, 'fail', '');
+        insertAndSendToken(res, userId, token);
+    });
+}
+
+function insertAndSendToken(res, userId, token) {
+    database.tokensDB.insertToken(userId, token, (err, results) => {
+        if (err) return sendJson(res, err.message, 'fail', '');
+        sendJson(res, '', 'success', { userId:userId, token:token });
+    });
+}
+
+app.use((req, res, next) => {
+    let userId = req.body.userId;
+    let token = req.body.token;
+    database.tokensDB.selectToken(userId, (err, results) => {
+        if (err) return sendJson(res, err.message, 'fail', '');
+        if (!results || results.length < 1 || token !== results[0].token) return sendJson(res, 'Нет доступа!', 'fail', '');
+        next();
+    });
+});
+
+// список результатов
+app.get("/results", function(req, res) {
+    database.resultsDB.selectTopResults(10, (err, results) => {
+        if (err) return sendJson(res, err.message, 'fail', '');
+        sendJson(res, '', 'success', { results:results });
+    });
+});
+
+// отправку json ответа
+function sendJson(res, message, status, result) {
+    return res.json({
+        message: message,
+        status: status,
+        result: result,
+    });
+}
 
 // 
 const PORT = process.env.PORT || 5000;

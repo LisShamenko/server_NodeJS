@@ -14,9 +14,13 @@ module.exports = (injectedPgWrapper, injectedCrypto) => {
 function insertUser(username, password, cbFunc) {
     let shaPass = crypto.createHash("sha256").update(password).digest("hex");
 
-    const query = `INSERT INTO users (name, password) VALUES ('${username}', '${shaPass}')`;
+    const query = `INSERT INTO users (name, password) VALUES ('${username}', '${shaPass}') returning id`;
 
-    pgWrapper.query(query, cbFunc);
+    pgWrapper.query(query, (err, results) => {
+        if (err) return cbFunc(err, null);
+        let isExist = (results.rows && results.rowCount >= 1);
+        cbFunc(false, isExist ? results.rows[0] : null);
+    });
 }
 
 function selectUser(username, password, cbFunc) {
