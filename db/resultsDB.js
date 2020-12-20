@@ -12,8 +12,12 @@ module.exports = (injectedPgWrapper) => {
 };
 
 function insertResult(userId, result, cbFunc) {
-    const query = `INSERT INTO results (user_id, result) VALUES ('${userId}', '${result}')`;
-    pgWrapper.query(query, cbFunc);
+    const query = `INSERT INTO results (user_id, result) VALUES ('${userId}', '${result}') returning id`;
+    pgWrapper.query(query, (err, results) => {
+        if (err) return cbFunc(err, null);
+        let isExist = (results.rows && results.rowCount >= 1);
+        cbFunc(false, isExist ? results.rows[0] : null);
+    });
 }
 
 function selectResult(userId, cbFunc) {

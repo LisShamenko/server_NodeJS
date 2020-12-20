@@ -29,75 +29,90 @@ app.use(testRouter);
 
 // запрос версии игры для проверки соединения
 app.get("/GameVersion", function(req, res) {
-    res.send('ok');
+    sendJson(res, '', 'success', { Version:'1.0.0' });
 });
 
 // регистрация пользователя
-app.post("/register", function(req, res) {
-    let username =  req.body.name;
-    let password = req.body.password;
-    database.userDB.selectUser(username, password, (err, result) => {
-        if (err) return sendJson(res, err.message, 'fail', '');
-        if (result != null && result.id) return sendJson(res, 'Пользователь уже существует!', 'fail', '');
+app.post("/Register", function(req, res) {
+    let username =  req.body.Name;
+    let password = req.body.Password;
+    database.userDB.selectUser(username, password, (err, results) => {
+        if (err) return sendJson(res, err.message, 'fail', null);
+        if (results != null && results.id) return sendJson(res, 'Пользователь уже существует!', 'fail', null);
         insertUser(res, username, password);
     });
 });
 
 function insertUser(res, username, password) {
-    database.userDB.insertUser(username, password, (err, result) => {
-        if (err) return sendJson(res, err.message, 'fail', '');
-        userLogin(res, result.id);
+    database.userDB.insertUser(username, password, (err, results) => {
+        if (err) return sendJson(res, err.message, 'fail', null);
+        if (!results || !results.id) return sendJson(res, 'Пользователь не создан!', 'fail', null);
+        userLogin(res, results.id);
     });
 }
 
 // аутентификация пользователя
-app.post("/login", function(req, res) {
-    let username = req.body.name;
-    let password = req.body.password;
-    database.userDB.selectUser(username, password, (err, result) => {
-        if (err) return sendJson(res, err.message, 'fail', '');
-        userLogin(res, result.id);
+app.post("/Login", function(req, res) {
+    let username = req.body.Name;
+    let password = req.body.Password;
+    database.userDB.selectUser(username, password, (err, results) => {
+        if (err) return sendJson(res, err.message, 'fail', null);
+        if (!results || !results.id) return sendJson(res, 'Пользователь не найден!', 'fail', null);
+        userLogin(res, results.id);
     });
 });
 
 function userLogin(res, userId) {
     database.createToken(userId, (err, token) => {
-        if (err) return sendJson(res, err.message, 'fail', '');
+        if (err) return sendJson(res, err.message, 'fail', null);
         insertAndSendToken(res, userId, token);
     });
 }
 
 function insertAndSendToken(res, userId, token) {
     database.tokensDB.insertToken(userId, token, (err, results) => {
-        if (err) return sendJson(res, err.message, 'fail', '');
-        sendJson(res, '', 'success', { userId:userId, token:token });
+        if (err) return sendJson(res, err.message, 'fail', null);
+        if (!results || !results.id) return sendJson(res, 'Токен не создан!', 'fail', null);
+        sendJson(res, '', 'success', { UserId:userId, Token:token });
     });
 }
 
 app.use((req, res, next) => {
-    let userId = req.body.userId;
-    let token = req.body.token;
-    database.tokensDB.selectToken(userId, (err, results) => {
-        if (err) return sendJson(res, err.message, 'fail', '');
-        if (!results || results.length < 1 || token !== results[0].token) return sendJson(res, 'Нет доступа!', 'fail', '');
+    let userId = req.headers.userid;
+    let token = req.headers.token;
+    if (!userId || !token) return sendJson(res, 'Ошибка аутентификации!', 'fail', null);
+    database.tokensDB.findToken(userId, token, (err, results) => {
+        if (err) return sendJson(res, err.message, 'fail', null);
+        if (!results) return sendJson(res, 'Нет доступа!', 'fail', null);
         next();
     });
 });
 
+// добавить результат
+app.post("/Result", function(req, res) {
+    let userId = req.body.UserId;
+    let result = req.body.Data;
+    database.resultsDB.insertResult(userId, result, (err, results) => {
+        if (err) return sendJson(res, err.message, 'fail', null);
+        if (!results || !results.id) return sendJson(res, 'Ошибка сохранения!', 'fail', null);
+        sendJson(res, '', 'success', null);
+    });
+});
+
 // список результатов
-app.get("/results", function(req, res) {
+app.get("/Results", function(req, res) {
     database.resultsDB.selectTopResults(10, (err, results) => {
-        if (err) return sendJson(res, err.message, 'fail', '');
-        sendJson(res, '', 'success', { results:results });
+        if (err) return sendJson(res, err.message, 'fail', null);
+        sendJson(res, '', 'success', { Results:results });
     });
 });
 
 // отправку json ответа
-function sendJson(res, message, status, result) {
+function sendJson(res, message, status, results) {
     return res.json({
-        message: message,
-        status: status,
-        result: result,
+        Message: message,
+        Status: status,
+        Result: results,
     });
 }
 
